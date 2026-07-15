@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="night">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mariam Khatab — Responsive Architecture</title>
+<meta name="description" content="Architecture, environmental computation and machine learning — buildings that read the sun, their patients and their drivers, and adapt.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,450;0,9..144,600;1,9..144,450&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   TOKENS — dual theme (night / paper), the "both worlds" spine
+   ============================================================ */
+:root{
+  --serif:"Fraunces",serif;
+  --sans:"Work Sans",system-ui,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+  --ease-in:cubic-bezier(.4,0,1,1);
+  --maxw:1240px;
+}
+html[data-theme="night"]{
+  --bg:#101219; --bg-2:#161923; --bg-3:#1d2130;
+  --text:#edeef4; --soft:#9aa0b8; --faint:#666c86;
+  --line:rgba(237,237,242,0.11); --line-2:rgba(237,237,242,0.06);
+  --glow-mix:0.9; --grain-op:0.05; --grain-blend:screen;
+  --shadow:0 30px 60px -28px rgba(0,0,0,0.7);
+  --card-hi:rgba(255,255,255,0.02);
+}
+html[data-theme="paper"]{
+  --bg:#faf8f3; --bg-2:#f2ede3; --bg-3:#eae3d5;
+  --text:#211f1b; --soft:#6d675c; --faint:#a39d8f;
+  --line:rgba(43,41,37,0.14); --line-2:rgba(43,41,37,0.07);
+  --glow-mix:0.5; --grain-op:0.03; --grain-blend:multiply;
+  --shadow:0 24px 48px -30px rgba(43,41,37,0.35);
+  --card-hi:rgba(43,41,37,0.015);
+}
+/* per-project time-of-day accents, resolved per theme */
+html[data-theme="night"] [data-key="dawn"]{--accent:#e5a83c;--accent-soft:rgba(229,168,60,.16);--accent-ink:#1c1305;}
+html[data-theme="night"] [data-key="dusk"]{--accent:#8b93ec;--accent-soft:rgba(139,147,236,.18);--accent-ink:#0c0d1a;}
+html[data-theme="night"] [data-key="tide"]{--accent:#3cae98;--accent-soft:rgba(60,174,152,.16);--accent-ink:#04211b;}
+html[data-theme="paper"] [data-key="dawn"]{--accent:#b07d24;--accent-soft:rgba(176,125,36,.13);--accent-ink:#fff;}
+html[data-theme="paper"] [data-key="dusk"]{--accent:#545dc0;--accent-soft:rgba(84,93,192,.12);--accent-ink:#fff;}
+html[data-theme="paper"] [data-key="tide"]{--accent:#2c8571;--accent-soft:rgba(44,133,113,.12);--accent-ink:#fff;}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--sans); -webkit-font-smoothing:antialiased;
+  transition:background .6s var(--ease), color .6s var(--ease);
+  overflow-x:hidden;
+}
+img{max-width:100%; display:block; -webkit-user-drag:none;}
+a{color:inherit; text-decoration:none;}
+::selection{background:var(--accent,#e5a83c); color:var(--accent-ink,#1c1305);}
+h1,h2,h3,h4{margin:0;}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important; transition-duration:.01ms!important;}
+  html{scroll-behavior:auto;}
+}
+
+/* ---------- craft layer: grain + cursor + progress ---------- */
+.grain{
+  position:fixed; inset:0; pointer-events:none; z-index:1;
+  opacity:var(--grain-op); mix-blend-mode:var(--grain-blend);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.progress{position:fixed; top:0; left:0; height:2px; width:0; z-index:200;
+  background:var(--accent,#e5a83c); transition:width .1s linear, background .5s var(--ease);}
+@media (pointer:fine){
+  body{cursor:none;}
+  a,button,input,label,summary,select,textarea{cursor:none;}
+  .cursor{position:fixed; top:0; left:0; z-index:9999; pointer-events:none;
+    width:8px; height:8px; border-radius:50%; background:var(--text);
+    transform:translate3d(-50%,-50%,0);
+    transition:width .25s var(--ease), height .25s var(--ease), background .3s var(--ease), opacity .2s;}
+  .cursor.grow{width:58px; height:58px; background:var(--accent,#e5a83c); opacity:.16;}
+  .cursor.tiny{width:4px; height:4px;}
+  .cursor-label{position:fixed; top:0; left:0; z-index:9999; pointer-events:none;
+    font-family:var(--mono); font-size:10px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--text); transform:translate3d(-50%,-50%,0); opacity:0; transition:opacity .2s; white-space:nowrap;}
+  .cursor-label.show{opacity:1;}
+}
+
+/* ---------- reveal ---------- */
+.reveal{opacity:0; transform:translateY(26px); transition:opacity .8s var(--ease), transform .8s var(--ease);}
+.reveal.in{opacity:1; transform:none;}
+.reveal.d1{transition-delay:.08s;} .reveal.d2{transition-delay:.16s;} .reveal.d3{transition-delay:.24s;}
+
+/* ---------- nav ---------- */
+.topnav{position:fixed; top:0; left:0; right:0; z-index:120;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:16px clamp(20px,5vw,52px);}
+.nav-inner{pointer-events:auto; display:flex; align-items:center; gap:6px;
+  background:color-mix(in srgb, var(--bg) 62%, transparent); backdrop-filter:blur(12px);
+  border:1px solid var(--line); border-radius:100px; padding:6px;}
+.brand{font-family:var(--serif); font-weight:600; font-size:.95rem; letter-spacing:.01em;
+  padding:8px 16px; border-radius:100px; white-space:nowrap;}
+.nav-links{display:flex; gap:2px; font-size:.78rem;}
+.nav-links a{padding:9px 14px; border-radius:100px; color:var(--soft); white-space:nowrap;
+  transition:color .2s var(--ease), background .2s var(--ease);}
+.nav-links a:hover{color:var(--text); background:var(--card-hi);}
+.theme-toggle{display:grid; place-items:center; width:38px; height:38px; border-radius:50%;
+  border:1px solid var(--line); background:var(--card-hi); color:var(--text); cursor:none;
+  transition:transform .3s var(--ease), border-color .2s;}
+.theme-toggle:hover{transform:rotate(-18deg); border-color:var(--accent,#e5a83c);}
+.theme-toggle svg{width:17px; height:17px;}
+.theme-toggle .moon{display:none;} .theme-toggle .sun{display:block;}
+html[data-theme="paper"] .theme-toggle .moon{display:block;}
+html[data-theme="paper"] .theme-toggle .sun{display:none;}
+.nav-toggle{display:none; place-items:center; width:38px; height:38px; border-radius:50%;
+  border:1px solid var(--line); background:var(--card-hi); color:var(--text); cursor:none;
+  transition:border-color .2s var(--ease);}
+.nav-toggle:hover{border-color:var(--accent,#e5a83c);}
+.nav-toggle svg{width:19px; height:19px;}
+.nav-toggle .ic-close{display:none;}
+.nav-toggle.open .ic-close{display:block;} .nav-toggle.open .ic-menu{display:none;}
+@media (max-width:720px){
+  .nav-links a{padding:8px 9px; font-size:.7rem;}
+  .brand{padding:8px 12px; font-size:.85rem;}
+}
+@media (max-width:520px){
+  .topnav{padding-top:14px; padding-bottom:14px;}
+  .nav-inner:last-child{position:relative;}
+  .nav-toggle{display:grid;}
+  .nav-links{
+    position:absolute; top:calc(100% + 10px); right:0; z-index:130;
+    flex-direction:column; gap:2px; padding:8px; min-width:200px;
+    background:color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter:blur(16px);
+    border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow);
+    opacity:0; transform:translateY(-10px) scale(.97); transform-origin:top right; pointer-events:none;
+    transition:opacity .26s var(--ease), transform .26s var(--ease);}
+  .nav-links.open{opacity:1; transform:none; pointer-events:auto;}
+  .nav-links a{padding:13px 16px; font-size:.86rem; border-radius:13px; color:var(--text);}
+  .nav-links a:hover{background:var(--card-hi);}
+}
+
+/* ---------- shell ---------- */
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 clamp(20px,5vw,52px); position:relative; z-index:2;}
+.eyebrow{font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; text-transform:uppercase; color:var(--soft);}
+
+/* ============================================================
+   HERO — scrubbable sun instrument
+   ============================================================ */
+.hero{position:relative; min-height:100dvh; display:flex; flex-direction:column; justify-content:center;
+  padding:120px 0 70px; overflow:hidden;}
+.hero-glow{position:absolute; inset:0; z-index:0; pointer-events:none; transition:background .6s ease;
+  background:radial-gradient(ellipse 120% 78% at 50% 118%,
+    color-mix(in srgb, var(--sun,#e5a83c) calc(var(--glow-mix)*100%), transparent), transparent 62%);}
+.hero .wrap{display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:end;}
+.hero-copy{max-width:36ch;}
+.hero h1{font-family:var(--serif); font-weight:600; font-size:clamp(2.5rem,6.2vw,5rem);
+  line-height:1.0; letter-spacing:-.015em; margin:20px 0 22px;}
+.hero h1 em{font-style:italic; font-weight:450; color:var(--sun,#e5a83c); transition:color .6s ease;}
+.hero .lede{font-size:clamp(1rem,1.4vw,1.16rem); max-width:44ch; color:var(--soft); line-height:1.62; margin:0 0 30px;}
+.hero-meta{display:flex; gap:26px; flex-wrap:wrap; font-family:var(--mono); font-size:.7rem;
+  text-transform:uppercase; letter-spacing:.08em; color:var(--faint);}
+.hero-meta b{color:var(--text); font-weight:500;}
+
+.arc-wrap{width:100%;}
+.arc-hint{font-family:var(--mono); font-size:.66rem; letter-spacing:.1em; text-transform:uppercase;
+  color:var(--faint); text-align:center; margin-bottom:8px;}
+svg#sunarc{width:100%; height:auto; touch-action:none; cursor:none; user-select:none; -webkit-user-select:none;}
+body.dragging, body.dragging *{user-select:none !important; -webkit-user-select:none;}
+body.dragging .cursor, body.dragging .cursor-label{opacity:0 !important;}
+.arc-path{fill:none; stroke:var(--line); stroke-width:1.5; stroke-dasharray:2 7; stroke-linecap:round;}
+.arc-marker{cursor:none;}
+.arc-marker circle{transition:r .2s var(--ease);}
+.arc-marker:hover circle{r:8;}
+.arc-marker text{font-family:var(--mono); font-size:10.5px; fill:var(--soft); letter-spacing:.05em;}
+.sun-dot{filter:drop-shadow(0 0 15px var(--sun,#e5a83c));}
+.arc-caption{display:flex; justify-content:space-between; font-family:var(--mono); font-size:.66rem;
+  color:var(--soft); letter-spacing:.08em; text-transform:uppercase; margin-top:8px;}
+.arc-caption #arcClock{color:var(--text); font-size:.82rem;}
+.scroll-cue{position:absolute; bottom:24px; left:clamp(20px,5vw,52px); z-index:2;
+  font-family:var(--mono); font-size:.66rem; color:var(--soft); letter-spacing:.12em; text-transform:uppercase;
+  display:flex; align-items:center; gap:9px;}
+.scroll-cue .bar{width:1px; height:26px; background:linear-gradient(var(--soft),transparent); animation:cue 2.4s var(--ease) infinite;}
+@keyframes cue{0%,100%{transform:scaleY(.5); transform-origin:top;} 50%{transform:scaleY(1);}}
+@media (max-width:900px){
+  .hero .wrap{grid-template-columns:1fr; gap:26px; align-items:start;}
+  .hero{padding:110px 0 90px;}
+}
+
+/* ============================================================
+   MANIFESTO
+   ============================================================ */
+.manifesto{padding:clamp(70px,10vw,130px) 0; border-top:1px solid var(--line);}
+.manifesto p{font-family:var(--serif); font-weight:300; font-size:clamp(1.5rem,3.4vw,2.7rem);
+  line-height:1.28; letter-spacing:-.01em; max-width:20ch; margin:0;}
+.manifesto p span{color:var(--soft);}
+.manifesto .sig{margin-top:34px; font-family:var(--mono); font-size:.74rem; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--soft);}
+
+/* ============================================================
+   INDEX — editorial zig-zag, 3D tilt
+   ============================================================ */
+.index{padding:20px 0 40px; border-top:1px solid var(--line);}
+.index-label{display:flex; justify-content:space-between; align-items:baseline; padding:26px 0 6px;
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--soft);}
+.index-row{display:grid; grid-template-columns:1fr 1fr; gap:clamp(28px,5vw,64px); align-items:center;
+  padding:clamp(40px,6vw,70px) 0; border-bottom:1px solid var(--line); cursor:none;}
+.index-row:nth-child(even) .row-media{order:2;}
+.row-media{aspect-ratio:4/3; border-radius:12px; overflow:hidden; border:1px solid var(--line);
+  background:var(--bg-2); perspective:1000px;}
+.row-media img{width:100%; height:100%; object-fit:cover; transition:transform .5s var(--ease); will-change:transform;}
+.index-row:hover .row-media img{transform:scale(1.05);}
+.row-body{position:relative;}
+.row-num{font-family:var(--serif); font-weight:300; font-size:clamp(3rem,6vw,5rem); line-height:1;
+  color:var(--accent); opacity:.2; position:absolute; top:-2.4rem; left:-.2rem; pointer-events:none;}
+.row-meta{display:flex; align-items:center; gap:10px; margin-bottom:14px; font-family:var(--mono);
+  font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; color:var(--soft);}
+.row-meta .dot{width:7px; height:7px; border-radius:50%; background:var(--accent);}
+.row-body h3{font-family:var(--serif); font-weight:600; font-size:clamp(1.6rem,2.8vw,2.3rem); line-height:1.1; margin-bottom:14px;}
+.row-body p{color:var(--soft); font-size:.96rem; line-height:1.62; max-width:44ch; margin:0 0 22px;}
+.view{display:inline-flex; align-items:center; gap:9px; font-family:var(--mono); font-size:.76rem;
+  text-transform:uppercase; letter-spacing:.05em; color:var(--text);}
+.view .arrow{transition:transform .3s var(--ease);}
+.index-row:hover .view .arrow{transform:translateX(6px);}
+@media (max-width:820px){
+  .index-row{grid-template-columns:1fr; gap:20px;}
+  .index-row:nth-child(even) .row-media{order:0;}
+  .row-num{position:static; display:block; margin-bottom:-1rem;}
+}
+
+/* ============================================================
+   PROJECT DEEP-DIVE
+   ============================================================ */
+section.project{position:relative; padding:clamp(80px,10vw,130px) 0; border-top:1px solid var(--line); scroll-margin-top:84px;}
+#contact{scroll-margin-top:84px;}
+.project-head{max-width:820px; margin-bottom:52px;}
+.p-eyebrow{display:inline-flex; align-items:center; gap:10px; font-family:var(--mono); font-size:.7rem;
+  letter-spacing:.1em; text-transform:uppercase; padding:7px 15px; border-radius:100px; margin-bottom:22px;
+  border:1px solid var(--accent-soft); color:var(--accent);}
+.p-eyebrow .dot{width:7px; height:7px; border-radius:50%; background:var(--accent);}
+.project-head h2{font-family:var(--serif); font-weight:600; font-size:clamp(2rem,4.4vw,3.4rem);
+  line-height:1.06; letter-spacing:-.015em; margin-bottom:20px;}
+.project-head .desc{color:var(--soft); font-size:1.04rem; line-height:1.68; max-width:60ch;}
+
+.stat-row{display:flex; flex-wrap:wrap; margin:44px 0 0; border-top:1px solid var(--line);}
+.stat{flex:1; min-width:140px; padding:22px 24px 0 0; border-right:1px solid var(--line);}
+.stat:last-child{border-right:none;}
+.stat .num{font-family:var(--serif); font-size:clamp(1.7rem,2.4vw,2.1rem); font-weight:600;}
+.stat .label{font-family:var(--mono); font-size:.66rem; color:var(--soft); text-transform:uppercase; letter-spacing:.05em; margin-top:7px;}
+
+.hero-image{border-radius:14px; overflow:hidden; border:1px solid var(--line); margin:56px 0; box-shadow:var(--shadow);}
+.hero-image img{width:100%;}
+
+/* tabs */
+.tabs{display:flex; gap:0; flex-wrap:wrap; border-bottom:1px solid var(--line); margin:64px 0 36px;}
+.tab-btn{font-family:var(--mono); font-size:.74rem; letter-spacing:.04em; text-transform:uppercase;
+  background:none; border:none; color:var(--soft); cursor:none; padding:13px 0; margin-right:26px;
+  position:relative; transition:color .2s var(--ease);}
+.tab-btn::after{content:""; position:absolute; left:0; right:0; bottom:-1px; height:2px; background:var(--accent);
+  transform:scaleX(0); transform-origin:left; transition:transform .3s var(--ease);}
+.tab-btn.active{color:var(--text);}
+.tab-btn.active::after{transform:scaleX(1);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block; animation:fadeup .4s var(--ease);}
+@keyframes fadeup{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+
+.panel-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:36px; align-items:start;}
+@media (max-width:860px){.panel-grid{grid-template-columns:1fr;}}
+
+.card{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:26px 28px;}
+.card + .card{margin-top:20px;}
+.card h3{font-family:var(--serif); font-weight:600; font-size:1.2rem; margin-bottom:12px;}
+.card p{color:var(--soft); line-height:1.66; font-size:.95rem; margin:0 0 12px;}
+.card p:last-child{margin-bottom:0;}
+code{font-family:var(--mono); font-size:.86em; background:var(--card-hi); padding:1px 5px; border-radius:4px; border:1px solid var(--line-2);}
+
+.figure{border-radius:12px; overflow:hidden; border:1px solid var(--line); background:var(--bg-2); cursor:none;}
+.figure img{width:100%; transition:transform .5s var(--ease);}
+.figure:hover img{transform:scale(1.04);}
+.figure figcaption{font-family:var(--mono); font-size:.7rem; color:var(--soft); padding:11px 15px; border-top:1px solid var(--line);}
+figure{margin:0;}
+
+.gallery{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:16px; margin-top:8px;}
+
+.kv-row{display:grid; grid-template-columns:1fr 1.4fr; gap:16px; padding:14px 0; border-bottom:1px solid var(--line);}
+.kv-row:last-child{border-bottom:none;}
+.kv-row .k{font-family:var(--mono); font-size:.72rem; color:var(--accent); text-transform:uppercase; letter-spacing:.04em;}
+.kv-row .v{font-size:.92rem; color:var(--soft); line-height:1.55;}
+
+.step{display:grid; grid-template-columns:44px 1fr; gap:18px; padding:20px 0; border-bottom:1px solid var(--line); counter-increment:step;}
+.step-list{counter-reset:step;}
+.step:last-child{border-bottom:none;}
+.step .n{font-family:var(--mono); font-size:.9rem; color:var(--accent);}
+.step .n::before{content:counter(step,decimal-leading-zero);}
+.step h4{font-weight:600; font-size:1rem; margin-bottom:6px;}
+.step p{margin:0; color:var(--soft); font-size:.92rem; line-height:1.6;}
+
+/* widgets */
+.widget{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:28px;}
+.widget h3{font-family:var(--serif); font-size:1.15rem; margin-bottom:6px;}
+.widget .hint{color:var(--soft); font-size:.85rem; line-height:1.55; margin-bottom:20px;}
+.slider-row{margin-bottom:20px;}
+.slider-row label{display:flex; justify-content:space-between; font-family:var(--mono); font-size:.74rem; color:var(--soft); margin-bottom:10px;}
+input[type=range]{width:100%; accent-color:var(--accent); cursor:none;}
+.toggle-row{display:flex; gap:8px; margin-bottom:20px;}
+.toggle-btn{flex:1; font-family:var(--mono); font-size:.72rem; padding:10px; border-radius:8px;
+  border:1px solid var(--line); background:none; color:var(--soft); cursor:none;
+  transition:background .2s var(--ease), color .2s var(--ease), border-color .2s var(--ease);}
+.toggle-btn.active{background:var(--accent-soft); color:var(--text); border-color:var(--accent);}
+.result-box{display:flex; align-items:baseline; gap:12px; padding:18px 20px; border-radius:10px;
+  background:var(--card-hi); border:1px solid var(--line);}
+.result-box .val{font-family:var(--serif); font-size:2.1rem; font-weight:600; transition:opacity .15s;}
+.result-box .unit{font-family:var(--mono); font-size:.8rem; color:var(--soft);}
+.result-note{font-size:.82rem; color:var(--soft); margin-top:14px; line-height:1.55;}
+
+.louver-demo{position:relative; height:170px; border-radius:10px; overflow:hidden; margin-bottom:8px;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 30%,var(--bg-3)),var(--bg)); border:1px solid var(--line);}
+.louver-slat{position:absolute; left:6%; right:6%; height:8px; background:var(--accent); border-radius:2px;
+  transform-origin:left center; transition:transform .5s cubic-bezier(.4,0,.2,1), opacity .5s var(--ease);}
+
+.mini-stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:2px; margin:8px 0 36px;
+  background:var(--line); border:1px solid var(--line); border-radius:12px; overflow:hidden;}
+.mini-stat{background:var(--bg-2); padding:20px;}
+.mini-stat .num{font-family:var(--serif); font-size:1.7rem; font-weight:600; color:var(--accent);}
+.mini-stat .lbl{font-family:var(--mono); font-size:.63rem; color:var(--soft); text-transform:uppercase; margin-top:5px;}
+@media (max-width:700px){.mini-stat-grid{grid-template-columns:repeat(2,1fr);}}
+
+.echo-cta{display:flex; flex-wrap:wrap; gap:24px; align-items:center; justify-content:space-between;
+  background:var(--accent-soft); border:1px solid var(--accent); border-radius:16px; padding:32px; margin-top:40px;}
+.echo-cta .txt h3{font-family:var(--serif); font-size:1.4rem; margin-bottom:8px;}
+.echo-cta .txt p{color:var(--soft); margin:0; max-width:46ch; font-size:.95rem; line-height:1.6;}
+.btn{display:inline-flex; align-items:center; gap:10px; font-family:var(--mono); font-size:.8rem;
+  text-transform:uppercase; letter-spacing:.06em; padding:14px 22px; border-radius:100px;
+  background:var(--accent); color:var(--accent-ink); font-weight:500; white-space:nowrap; cursor:none;
+  transition:transform .25s var(--ease), box-shadow .25s var(--ease);}
+.btn:hover{transform:translateY(-2px); box-shadow:0 12px 26px -10px color-mix(in srgb,var(--accent) 70%,transparent);}
+
+.credit{margin-top:60px; padding-top:24px; border-top:1px solid var(--line);
+  font-family:var(--mono); font-size:.76rem; color:var(--soft); display:flex; flex-wrap:wrap; gap:8px 18px;}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer{padding:clamp(70px,9vw,110px) 0 48px; background:var(--bg-2); border-top:1px solid var(--line); position:relative; z-index:2;}
+footer .row{display:flex; flex-wrap:wrap; justify-content:space-between; gap:30px; align-items:flex-end;}
+footer h2{font-family:var(--serif); font-weight:600; font-size:clamp(1.9rem,4vw,3rem); line-height:1.08; max-width:16ch; letter-spacing:-.01em;}
+footer .email{font-family:var(--mono); font-size:1rem; border-bottom:1px solid var(--accent); padding-bottom:4px; cursor:none;
+  transition:color .2s var(--ease);}
+footer .email:hover{color:var(--accent);}
+footer .meta{font-family:var(--mono); font-size:.72rem; color:var(--soft); margin-top:44px; line-height:1.7; max-width:70ch;}
+
+/* ---------- lightbox ---------- */
+.lightbox{position:fixed; inset:0; z-index:1000; display:none; align-items:center; justify-content:center; padding:5vw;
+  background:color-mix(in srgb,var(--bg) 88%,black); backdrop-filter:blur(6px);}
+.lightbox.open{display:flex; animation:fadeup .25s var(--ease);}
+.lightbox img{max-width:100%; max-height:88vh; border-radius:8px; box-shadow:var(--shadow);}
+.lightbox-close{position:absolute; top:24px; right:5vw; font-family:var(--mono); font-size:.82rem; cursor:none;
+  background:var(--bg-2); border:1px solid var(--line); color:var(--text); padding:10px 18px; border-radius:100px;}
+
+/* ---------- touch + small-screen polish ---------- */
+/* neutralise sticky :hover scale on touch devices */
+@media (hover:none){
+  .index-row:hover .row-media img,
+  .figure:hover img{transform:none;}
+  .index-row:hover .view .arrow{transform:none;}
+}
+@media (max-width:640px){
+  /* tabs: clean single-line horizontal scroll instead of ragged wrap */
+  .tabs{flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab-btn{flex:0 0 auto; white-space:nowrap; margin-right:22px;}
+  /* stat-row: 2-up grid, no dangling vertical dividers */
+  .stat-row{border-top:none; gap:0 18px;}
+  .stat{flex:0 0 calc(50% - 9px); min-width:0; border-right:none;
+    border-top:1px solid var(--line); padding:16px 0 0;}
+  /* CTA becomes a full-width tap target */
+  .echo-cta{padding:24px;}
+  .echo-cta .btn{width:100%; justify-content:center;}
+}
+@media (max-width:420px){
+  .hero-meta{gap:8px 18px;}
+  .kv-row{grid-template-columns:1fr; gap:5px;}
+  .lightbox-close{top:16px; right:16px;}
+}
+
+::-webkit-scrollbar{width:11px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--bg-3); border-radius:6px; border:3px solid var(--bg);}
+</style>
+</head>
+<body data-key="dawn">
+
+<div class="grain"></div>
+<div class="progress" id="progress"></div>
+<div class="cursor" id="cursor"></div>
+<div class="cursor-label" id="cursorLabel"></div>
+
+<!-- ============ NAV ============ -->
+<nav class="topnav">
+  <div class="nav-inner">
+    <a class="brand" href="#top" data-cursor="Top">M. KHATAB</a>
+  </div>
+  <div class="nav-inner">
+    <div class="nav-links" id="navLinks">
+      <a href="#echoana">ECHOANA</a>
+      <a href="#circadian">Circadian</a>
+      <a href="#parktech">Park Tech</a>
+      <a href="#contact">Contact</a>
+    </div>
+    <button class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="navLinks" data-cursor="Menu">
+      <svg class="ic-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <svg class="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+    <button class="theme-toggle" id="themeToggle" aria-label="Toggle day / night" data-cursor="Time">
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.6M12 19.4V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.6M19.4 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/>
+      </svg>
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 14.2A8.3 8.3 0 1 1 9.8 3.5a6.5 6.5 0 0 0 10.7 10.7Z"/>
+      </svg>
+    </button>
+  </div>
+</nav>
+
+<!-- ============ HERO ============ -->
+<header class="hero" id="top">
+  <div class="hero-glow" id="heroGlow"></div>
+  <div class="wrap">
+    <div class="hero-copy">
+      <div class="eyebrow">Architecture · Environmental Computation · Machine Learning</div>
+      <h1>Spaces that read the <em id="sunWord">sun</em>, and adapt.</h1>
+      <p class="lede">Three projects built around one question: what happens when a building senses its patients, drivers and daylight instead of ignoring them? Drag the arc to move a day across the sky.</p>
+      <div class="hero-meta">
+        <span><b>03</b> projects</span>
+        <span><b>NGU</b> · Cairo, 30.13°N</span>
+        <span><b>Grasshopper</b> · Ladybug · scikit-learn</span>
+      </div>
+    </div>
+
+    <div class="arc-wrap">
+      <div class="arc-hint">drag the sun ↔</div>
+      <svg id="sunarc" viewBox="0 0 920 250" preserveAspectRatio="xMidYMid meet">
+        <path class="arc-path" d="M 40 220 Q 460 -140 880 220" />
+        <g class="arc-marker" data-target="echoana" data-t="0.18">
+          <circle r="6"></circle><text text-anchor="middle">ECHOANA</text>
+        </g>
+        <g class="arc-marker" data-target="circadian" data-t="0.5">
+          <circle r="6"></circle><text text-anchor="middle">CIRCADIAN</text>
+        </g>
+        <g class="arc-marker" data-target="parktech" data-t="0.85">
+          <circle r="6"></circle><text text-anchor="middle">PARK TECH</text>
+        </g>
+        <circle id="sunDot" class="sun-dot" cx="40" cy="220" r="10"></circle>
+      </svg>
+      <div class="arc-caption"><span>Dawn</span><span id="arcClock">09:00</span><span>Dusk</span></div>
+    </div>
+  </div>
+  <div class="scroll-cue"><span class="bar"></span>Scroll</div>
+</header>
+
+<!-- ============ MANIFESTO ============ -->
+<section class="manifesto">
+  <div class="wrap">
+    <p class="reveal">A building is not a fixed object. <span>It is an instrument that can measure light, heat and people — and answer them.</span></p>
+    <div class="sig reveal d1">— Mariam Khatab, Architecture Engineering</div>
+  </div>
+</section>
+
+<!-- ============ INDEX ============ -->
+<section class="index">
+  <div class="wrap">
+    <div class="index-label reveal"><span>Selected work</span><span>2023 — 2025</span></div>
+
+    <div class="index-row reveal" data-goto="echoana" data-key="tide" data-cursor="Open">
+      <div class="row-media tilt"><img src="https://mariamkhatab.github.io/ECHOANA/figures/room_signatures.png" alt="ECHOANA therapeutic room-signature heatmap"></div>
+      <div class="row-body">
+        <div class="row-num">01</div>
+        <div class="row-meta"><span class="dot"></span>Individual · ML-driven architecture</div>
+        <h3>ECHOANA</h3>
+        <p>A recovery residence where machine learning discovers therapeutic room profiles from patient data and drives a facade that eases open as each patient heals.</p>
+        <span class="view">View project <span class="arrow">→</span></span>
+      </div>
+    </div>
+    <div class="index-row reveal" data-goto="circadian" data-key="dusk" data-cursor="Open">
+      <div class="row-media tilt"><img src="assets/circadian_web/slide-24.jpg" alt="Circadian hospital facade renders by orientation"></div>
+      <div class="row-body">
+        <div class="row-num">02</div>
+        <div class="row-meta"><span class="dot"></span>Individual · Performative form-finding</div>
+        <h3>Circadian-Responsive Hospital Room</h3>
+        <p>Room geometry and window size generated from a circadian light target instead of a floor-plan template — tuned to regulate patient melatonin.</p>
+        <span class="view">View project <span class="arrow">→</span></span>
+      </div>
+    </div>
+    <div class="index-row reveal" data-goto="parktech" data-key="dawn" data-cursor="Open">
+      <div class="row-media tilt"><img src="assets/parktech_web/slide-31.jpg" alt="Park Tech NGU kinetic shading canopy render"></div>
+      <div class="row-body">
+        <div class="row-num">03</div>
+        <div class="row-meta"><span class="dot"></span>Team · Sensing structure</div>
+        <h3>Park Tech NGU</h3>
+        <p>A campus parking lot re-imagined as a sensing structure — ultrasonic bays, an RFID gate, and a canopy of kinetic louvers that track the sun across the day.</p>
+        <span class="view">View project <span class="arrow">→</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROJECT 3 — ECHOANA ============ -->
+<section class="project" id="echoana" data-key="tide">
+  <div class="wrap">
+    <div class="project-head reveal">
+      <span class="p-eyebrow"><span class="dot"></span>01 — ML-driven architecture</span>
+      <h2>ECHOANA</h2>
+      <p class="desc">A wellness-recovery residence where room assignment is usually arbitrary. ECHOANA replaces that guesswork with a two-stage pipeline — k-means discovers four therapeutic room profiles directly from patient data, a classifier generalizes them to new admissions, and a recovery regressor drives an adaptive facade that eases open as each patient heals.</p>
+    </div>
+
+    <div class="mini-stat-grid reveal">
+      <div class="mini-stat"><div class="num">1,500</div><div class="lbl">Patients, NHANES 2017–18</div></div>
+      <div class="mini-stat"><div class="num">4</div><div class="lbl">Room groups, discovered</div></div>
+      <div class="mini-stat"><div class="num">90.9%</div><div class="lbl">Classifier test accuracy</div></div>
+      <div class="mini-stat"><div class="num">R²·0.84</div><div class="lbl">45-day recovery regressor</div></div>
+    </div>
+
+    <div class="panel-grid reveal">
+      <div class="card">
+        <h3>Four therapeutic signatures</h3>
+        <div class="kv-row"><div class="k">Group A</div><div class="v">4 single rooms, south — max all-day sun, nearest to care. Best for low vitamin D + high physical need.</div></div>
+        <div class="kv-row"><div class="k">Group B</div><div class="v">3 double rooms, west — strong afternoon sun, for sun-seeking patients with a caretaker.</div></div>
+        <div class="kv-row"><div class="k">Group C</div><div class="v">1 double room, north — soft diffuse light, for light-sensitive patients with a caretaker.</div></div>
+        <div class="kv-row"><div class="k">Group D</div><div class="v">2 single rooms, north/courtyard — garden view, where a biophilic view outperforms direct sun.</div></div>
+      </div>
+      <figure class="figure" data-zoom="https://mariamkhatab.github.io/ECHOANA/figures/room_signatures.png" data-cursor="Zoom">
+        <img src="https://mariamkhatab.github.io/ECHOANA/figures/room_signatures.png" loading="lazy" alt="Heatmap of room therapeutic signatures">
+        <figcaption>Therapeutic-signature heatmap across the four room groups</figcaption>
+      </figure>
+    </div>
+
+    <div class="gallery reveal" style="margin-top:24px;">
+      <figure class="figure" data-zoom="https://mariamkhatab.github.io/ECHOANA/figures/recovery_facade.png" data-cursor="Zoom"><img src="https://mariamkhatab.github.io/ECHOANA/figures/recovery_facade.png" loading="lazy" alt="Adaptive facade openness schedule"><figcaption>Facade openness over a 45-day stay — eases toward baseline as patients heal</figcaption></figure>
+      <figure class="figure" data-zoom="https://mariamkhatab.github.io/ECHOANA/figures/feature_importance.png" data-cursor="Zoom"><img src="https://mariamkhatab.github.io/ECHOANA/figures/feature_importance.png" loading="lazy" alt="Random forest feature importance chart"><figcaption>Feature importance — caretaker presence and light sensitivity drive assignment</figcaption></figure>
+      <figure class="figure" data-zoom="https://mariamkhatab.github.io/ECHOANA/figures/cluster_validation.png" data-cursor="Zoom"><img src="https://mariamkhatab.github.io/ECHOANA/figures/cluster_validation.png" loading="lazy" alt="Cluster validation charts"><figcaption>Elbow + silhouette validation for k=2 per caretaker pool</figcaption></figure>
+    </div>
+
+    <div class="echo-cta reveal">
+      <div class="txt">
+        <h3>Take the 3D room-matching quiz</h3>
+        <p>The full build is a standalone site: a symptom quiz feeds the real trained model (transpiled to JS) and lights up your matched room in a rotating 3D model of the residence.</p>
+      </div>
+      <a class="btn magnetic" href="https://mariamkhatab.github.io/ECHOANA/" target="_blank" rel="noopener" data-cursor="Launch">Launch ECHOANA →</a>
+    </div>
+
+    <div class="credit">
+      <span>Individual project — Mariam Khatab</span><span>·</span><span>K-means · Random Forest · Gradient Boosting · GhPython round-trip to Rhino</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROJECT 2 — CIRCADIAN ============ -->
+<section class="project" id="circadian" data-key="dusk">
+  <div class="wrap">
+    <div class="project-head reveal">
+      <span class="p-eyebrow"><span class="dot"></span>02 — Individual project</span>
+      <h2>Circadian-Responsive Hospital Room Design</h2>
+      <p class="desc">76% of inpatient studies report poor sleep quality and insufficient duration. This project asks a performative-design question: can room geometry and window size be generated from a circadian light target instead of a floor-plan template — and does that regulate melatonin well enough to matter clinically?</p>
+    </div>
+
+    <div class="hero-image reveal"><img src="assets/circadian_web/slide-24.jpg" alt="Facade renders showing perforation differences by orientation"></div>
+
+    <div class="panel-grid reveal" style="margin-top:56px;">
+      <div class="widget">
+        <h3>Melanopic lux calculator</h3>
+        <p class="hint">Melanopic lux — the metric that actually drives the circadian clock — isn't raw brightness. It's photopic lux scaled by a melanopic daylight efficacy ratio (mDER) that depends on the light's spectrum.</p>
+        <div class="toggle-row">
+          <button class="toggle-btn active" data-mder="1.1">Daylight · mDER 1.1</button>
+          <button class="toggle-btn" data-mder="0.7">Warm white · mDER 0.7</button>
+        </div>
+        <div class="slider-row">
+          <label><span>Photopic illuminance</span><span id="luxVal">400 lux</span></label>
+          <input type="range" id="luxSlider" min="50" max="2000" value="400" step="10">
+        </div>
+        <div class="result-box"><span class="val" id="melResult">440</span><span class="unit">melanopic lux</span></div>
+        <div class="result-note">Melanopic lux = photopic lux × mDER. Daytime targets sit well above 250 melanopic lux to entrain the clock; evening exposure is kept low by switching to warm-white sources with a lower mDER — exactly the logic the room geometry is optimized against.</div>
+      </div>
+
+      <div class="card">
+        <h3>Orientation logic</h3>
+        <div class="kv-row"><div class="k">North</div><div class="v">Diffuse daylight, no direct sun → highest facade perforation.</div></div>
+        <div class="kv-row"><div class="k">East</div><div class="v">Soft morning sun → medium–high perforation.</div></div>
+        <div class="kv-row"><div class="k">South</div><div class="v">Strong, near-constant sun exposure → lowest perforation.</div></div>
+        <div class="kv-row"><div class="k">West</div><div class="v">Harsh afternoon sun → controlled, tightened perforation.</div></div>
+        <p style="margin-top:16px; color:var(--soft); line-height:1.66; font-size:.95rem;">A Galapagos genetic solver evolves the perforation domain per orientation, with fitness set to maximize spatial Daylight Autonomy (sDA) from Honeybee — so identical orientations end up with different facades once real site context and shading are accounted for.</p>
+      </div>
+    </div>
+
+    <div class="gallery reveal" style="margin-top:48px;">
+      <figure class="figure" data-zoom="assets/circadian_web/slide-05.jpg" data-cursor="Zoom"><img src="assets/circadian_web/slide-05.jpg" loading="lazy" alt="76 percent poor inpatient sleep statistic"><figcaption>The clinical problem — 76% of inpatient studies report poor sleep</figcaption></figure>
+      <figure class="figure" data-zoom="assets/circadian_web/slide-08.jpg" data-cursor="Zoom"><img src="assets/circadian_web/slide-08.jpg" loading="lazy" alt="Melanopic lux formula slide"><figcaption>Melanopic lux, defined</figcaption></figure>
+      <figure class="figure" data-zoom="assets/circadian_web/slide-20.jpg" data-cursor="Zoom"><img src="assets/circadian_web/slide-20.jpg" loading="lazy" alt="Case studies of circadian hospital lighting"><figcaption>Case studies — Vikærgården, Denmark · Virgen del Rocío ICU, Seville</figcaption></figure>
+      <figure class="figure" data-zoom="assets/circadian_web/slide-22.jpg" data-cursor="Zoom"><img src="assets/circadian_web/slide-22.jpg" loading="lazy" alt="sDA facade evaluation"><figcaption>Static facade evaluated against sDA targets across orientations</figcaption></figure>
+    </div>
+
+    <div class="credit">
+      <span>Individual project — Mariam Khatab</span><span>·</span><span>Performative form-finding · Honeybee / Ladybug / Galapagos</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROJECT 1 — PARK TECH ============ -->
+<section class="project" id="parktech" data-key="dawn">
+  <div class="wrap">
+    <div class="project-head reveal">
+      <span class="p-eyebrow"><span class="dot"></span>03 — Team project · New Giza University</span>
+      <h2>Park Tech NGU</h2>
+      <p class="desc">NGU's campus parking was informal, unshaded and unsafe — no navigation, no space discipline, no relief from Cairo's heat. Park Tech NGU redesigns the lot as a sensing structure: ultrasonic bays, an RFID gate, and a canopy of kinetic louvers that track the sun and fold open and closed across the day.</p>
+    </div>
+
+    <div class="hero-image reveal"><img src="assets/parktech_web/slide-31.jpg" alt="3D render of the Park Tech NGU kinetic shading canopy over parking bays"></div>
+
+    <div class="stat-row reveal">
+      <div class="stat"><div class="num">5</div><div class="label">Sensing subsystems</div></div>
+      <div class="stat"><div class="num">70–80%</div><div class="label">Radiation cut, adaptive louvers</div></div>
+      <div class="stat"><div class="num">10</div><div class="label">Solutions, ranked A→C</div></div>
+      <div class="stat"><div class="num">4</div><div class="label">Team members</div></div>
+    </div>
+
+    <div class="tabs reveal" data-group="pt">
+      <button class="tab-btn active" data-tab="pt-problem">Problem &amp; Survey</button>
+      <button class="tab-btn" data-tab="pt-env">Environmental Analysis</button>
+      <button class="tab-btn" data-tab="pt-system">Sensing System</button>
+      <button class="tab-btn" data-tab="pt-facade">Kinetic Facade</button>
+      <button class="tab-btn" data-tab="pt-result">Fabrication &amp; Result</button>
+    </div>
+
+    <div class="tab-panel active" id="pt-problem" data-group="pt">
+      <div class="panel-grid">
+        <div>
+          <div class="card">
+            <h3>Site &amp; problem statement</h3>
+            <p>NGU's parking suffers from poor organization, inefficient space usage and limited safety — causing congestion, unauthorized parking and daily inconvenience. The brief called for a smart intervention: better layout, real-time monitoring, and intelligent shading for cars and people.</p>
+            <p>75 students were surveyed. 84% see cars parked outside their lane every day or multiple times a week; 69% wanted a digital map of available spots before anything else.</p>
+          </div>
+          <div class="card">
+            <h3>What the survey actually said</h3>
+            <p style="font-style:italic;">"Please put lines on the ground — people leave so much space they take two spots with one car." · "Add convex mirrors at intersections and speed bumps." · "People should park correctly!!"</p>
+          </div>
+        </div>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-04.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-04.jpg" loading="lazy" alt="Survey results charts">
+          <figcaption>Summary of the 75-response campus parking survey</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="pt-env" data-group="pt">
+      <div class="panel-grid">
+        <figure class="figure" data-zoom="assets/parktech_web/slide-06.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-06.jpg" loading="lazy" alt="Sun path 3D and 2D diagrams for the site">
+          <figcaption>Sun path study, 3D and 2D — Cairo, 30.13°N</figcaption>
+        </figure>
+        <div class="card">
+          <h3>Cairo's climate, in numbers</h3>
+          <div class="kv-row"><div class="k">Comfort</div><div class="v">Only 12.1% of annual hours fall naturally in the comfort zone (ASHRAE 55).</div></div>
+          <div class="kv-row"><div class="k">Humidity</div><div class="v">Peaks at 84.5% in winter, drops to 14.4% in May — nearly the inverse of temperature.</div></div>
+          <div class="kv-row"><div class="k">Heat</div><div class="v">Summer dry-bulb reaches 43°C; sensors need shaded, heat-resistant housings.</div></div>
+          <div class="kv-row"><div class="k">Wind</div><div class="v">Dominant NNE and ESE at up to 14.9 m/s — panels need wind-shielded mounts.</div></div>
+        </div>
+      </div>
+      <div class="gallery" style="margin-top:24px;">
+        <figure class="figure" data-zoom="assets/parktech_web/slide-10.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-10.jpg" loading="lazy" alt="Sun shading chart">
+          <figcaption>Sun shading chart — hours needing shade by season</figcaption>
+        </figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-13.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-13.jpg" loading="lazy" alt="Ladybug incident radiation analysis">
+          <figcaption>Ladybug incident-radiation analysis, sensor placement logic</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="pt-system" data-group="pt">
+      <div class="panel-grid">
+        <div class="card">
+          <h3>Five subsystems, one board</h3>
+          <div class="step-list">
+            <div class="step"><span class="n"></span><div><h4>Smart shading</h4><p>LDR + servo motors auto-adjust the louvers to sun intensity.</p></div></div>
+            <div class="step"><span class="n"></span><div><h4>Car detection</h4><p>Ultrasonic sensor + red/green LED per bay shows availability at a glance.</p></div></div>
+            <div class="step"><span class="n"></span><div><h4>RFID access gate</h4><p>RFID reader + motorized arm automates and secures entry/exit.</p></div></div>
+            <div class="step"><span class="n"></span><div><h4>Climate-controlled waiting area</h4><p>Temperature sensor + fan keep the waiting zone livable in summer.</p></div></div>
+            <div class="step"><span class="n"></span><div><h4>Data logging</h4><p>SD-card module records light, temperature and occupancy for monitoring.</p></div></div>
+          </div>
+        </div>
+        <div>
+          <figure class="figure" data-zoom="assets/parktech_web/slide-24.jpg" data-cursor="Zoom">
+            <img src="assets/parktech_web/slide-24.jpg" loading="lazy" alt="Arduino circuit diagram for sensors and RFID">
+            <figcaption>Breadboard circuit — ultrasonic + LDR + servo, and the RC522 RFID interface</figcaption>
+          </figure>
+          <div class="card">
+            <h3>Feature → input → output</h3>
+            <div class="kv-row"><div class="k">Detection</div><div class="v">Ultrasonic sensor → red/green LED</div></div>
+            <div class="kv-row"><div class="k">Shading</div><div class="v">LDR light level → servo louver angle</div></div>
+            <div class="kv-row"><div class="k">Gate</div><div class="v">RFID tag + distance → motor + LEDs</div></div>
+            <div class="kv-row"><div class="k">Climate</div><div class="v">Temperature sensor → fan on/off</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="gallery" style="margin-top:24px;">
+        <figure class="figure" data-zoom="assets/parktech_web/slide-25.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-25.jpg" loading="lazy" alt="Shading flowchart"><figcaption>Flowchart — shading logic</figcaption>
+        </figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-27.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-27.jpg" loading="lazy" alt="RFID gate flowchart"><figcaption>Flowchart — RFID gate control</figcaption>
+        </figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-29.jpg" data-cursor="Zoom">
+          <img src="assets/parktech_web/slide-29.jpg" loading="lazy" alt="Sensor placement on the louver structure"><figcaption>Sensor placement on the shading structure</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="tab-panel" id="pt-facade" data-group="pt">
+      <div class="panel-grid">
+        <div class="widget">
+          <h3>Louver response, live</h3>
+          <p class="hint">The Grasshopper definition reads an LDR-equivalent light value and rotates each louver toward the sun vector. Drag to see the canopy respond.</p>
+          <div class="slider-row">
+            <label><span>Sun intensity</span><span id="ldrVal">62%</span></label>
+            <input type="range" id="ldrSlider" min="0" max="100" value="62">
+          </div>
+          <div class="louver-demo" id="louverDemo"></div>
+          <div class="result-note">At low intensity the louvers lie flat to admit light and warmth; as intensity climbs they rotate shut, tracking the sun vector from date and location — the same logic driving the real servo in the physical prototype.</div>
+        </div>
+        <div>
+          <figure class="figure" data-zoom="assets/parktech_web/kinetic-louvers-gh.jpg" data-cursor="Zoom">
+            <img src="assets/parktech_web/kinetic-louvers-gh.jpg" loading="lazy" alt="Grasshopper definition for kinetic louvers">
+            <figcaption>Grasshopper: kinetic-louver script, revised for sun-position attraction + Ladybug sun path</figcaption>
+          </figure>
+          <div class="card">
+            <h3>How the script works</h3>
+            <p>An offset surface is gridded into louver strips, each rotated by a distance-to-attractor value remapped against a live sun path (Ladybug <code>ImportEPW</code> + <code>SunPath</code>). The center point acts like the physical LDR: maximum alignment with the sun vector means maximum exposure — exactly the angle that drives the servo on the built prototype.</p>
+          </div>
+        </div>
+      </div>
+      <div class="hero-image" style="margin-top:24px;"><img src="assets/parktech_web/slide-19.jpg" loading="lazy" alt="Shading device analysis diagram"></div>
+    </div>
+
+    <div class="tab-panel" id="pt-result" data-group="pt">
+      <div class="gallery">
+        <figure class="figure" data-zoom="assets/parktech_web/slide-20.jpg" data-cursor="Zoom"><img src="assets/parktech_web/slide-20.jpg" loading="lazy" alt="Circulation diagram"><figcaption>Circulation diagram</figcaption></figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-21.jpg" data-cursor="Zoom"><img src="assets/parktech_web/slide-21.jpg" loading="lazy" alt="Plan and elevation drawings"><figcaption>Plans &amp; section</figcaption></figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-22.jpg" data-cursor="Zoom"><img src="assets/parktech_web/slide-22.jpg" loading="lazy" alt="Canopy elevation drawing"><figcaption>Canopy elevation, dimensioned</figcaption></figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-23.jpg" data-cursor="Zoom"><img src="assets/parktech_web/slide-23.jpg" loading="lazy" alt="Materials board"><figcaption>Materials — PVC-coated polyester over a waffle structure; Arduino UNO kit</figcaption></figure>
+        <figure class="figure" data-zoom="assets/parktech_web/slide-33.jpg" data-cursor="Zoom"><img src="assets/parktech_web/slide-33.jpg" loading="lazy" alt="Final physical model at night"><figcaption>Final physical model, night shot</figcaption></figure>
+        <figure class="figure" data-zoom="assets/parktech_web/sensing-poster.jpg" data-cursor="Zoom"><img src="assets/parktech_web/sensing-poster.jpg" loading="lazy" alt="Sensing final poster"><figcaption>Final sensing poster</figcaption></figure>
+      </div>
+    </div>
+
+    <div class="credit">
+      <span>Team — Hajar Fouad · Mariam Khatab · Zeina Waheed Khattab · Youssef Shawkat</span>
+      <span>·</span><span>New Giza University, Architecture Engineering</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer id="contact">
+  <div class="wrap">
+    <div class="row">
+      <h2 class="reveal">Let's talk about buildings that pay attention.</h2>
+      <a class="email reveal d1" href="mailto:mariam.khatab@example.com" data-cursor="Email">mariam.khatab@example.com</a>
+    </div>
+    <div class="meta reveal d2">Architecture Engineering · New Giza University — ECHOANA, Circadian-Responsive Hospital Room Design, and Park Tech NGU. Built with Grasshopper, Ladybug Tools and scikit-learn.</div>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox">
+  <button class="lightbox-close" id="lbClose" data-cursor="Close">Close ✕</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var finePointer = window.matchMedia('(pointer: fine)').matches;
+
+  /* ---------- Theme ---------- */
+  var root = document.documentElement;
+  var stored = null;
+  try{ stored = localStorage.getItem('mk-theme'); }catch(e){}
+  if(stored){ root.setAttribute('data-theme', stored); }
+  else if(window.matchMedia('(prefers-color-scheme: light)').matches){ root.setAttribute('data-theme','paper'); }
+  document.getElementById('themeToggle').addEventListener('click', function(){
+    var next = root.getAttribute('data-theme') === 'night' ? 'paper' : 'night';
+    root.setAttribute('data-theme', next);
+    try{ localStorage.setItem('mk-theme', next); }catch(e){}
+  });
+
+  /* ---------- Mobile nav ---------- */
+  var navToggle = document.getElementById('navToggle');
+  var navLinks = document.getElementById('navLinks');
+  function setNav(open){
+    navLinks.classList.toggle('open', open);
+    navToggle.classList.toggle('open', open);
+    navToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  }
+  navToggle.addEventListener('click', function(e){ e.stopPropagation(); setNav(!navLinks.classList.contains('open')); });
+  navLinks.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', function(){ setNav(false); }); });
+  document.addEventListener('click', function(e){
+    if(navLinks.classList.contains('open') && !navLinks.contains(e.target) && e.target !== navToggle) setNav(false);
+  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') setNav(false); });
+
+  /* ---------- Scroll progress ---------- */
+  var progress = document.getElementById('progress');
+  function onScroll(){
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    progress.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+  }
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+  /* ---------- Reveal ---------- */
+  var reveals = document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window && !reduce){
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
+    }, {threshold:0.12, rootMargin:'0px 0px -8% 0px'});
+    reveals.forEach(function(r){ io.observe(r); });
+  } else { reveals.forEach(function(r){ r.classList.add('in'); }); }
+
+  /* ---------- Section accent → progress bar ---------- */
+  var sections = document.querySelectorAll('section.project, header.hero, section.index');
+  if('IntersectionObserver' in window){
+    var accentIO = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){
+          var k = en.target.getAttribute('data-key') || document.body.getAttribute('data-key');
+          if(k) document.body.setAttribute('data-key', k);
+        }
+      });
+    }, {threshold:0.4});
+    sections.forEach(function(s){ accentIO.observe(s); });
+  }
+
+  /* ---------- Custom cursor ---------- */
+  if(finePointer){
+    var cursor = document.getElementById('cursor');
+    var label = document.getElementById('cursorLabel');
+    var tx = window.innerWidth/2, ty = window.innerHeight/2, shown = false;
+    window.addEventListener('mousemove', function(e){
+      tx = e.clientX; ty = e.clientY;
+      if(!shown){ shown = true; cursor.style.opacity = ''; }
+      cursor.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) translate(-50%,-50%)';
+      label.style.transform = 'translate3d(' + tx + 'px,' + (ty+26) + 'px,0) translate(-50%,-50%)';
+    });
+    var targets = document.querySelectorAll('a,button,[data-cursor],[data-goto],.figure,.arc-marker,input[type=range]');
+    targets.forEach(function(t){
+      t.addEventListener('mouseenter', function(){
+        cursor.classList.add('grow');
+        var l = t.getAttribute('data-cursor');
+        if(l){ label.textContent = l; label.classList.add('show'); }
+      });
+      t.addEventListener('mouseleave', function(){
+        cursor.classList.remove('grow'); label.classList.remove('show');
+      });
+    });
+    document.addEventListener('mousedown', function(){ cursor.classList.add('tiny'); });
+    document.addEventListener('mouseup', function(){ cursor.classList.remove('tiny'); });
+  }
+
+  /* ---------- Magnetic ---------- */
+  if(finePointer && !reduce){
+    document.querySelectorAll('.magnetic').forEach(function(el){
+      el.addEventListener('mousemove', function(e){
+        var r = el.getBoundingClientRect();
+        var mx = e.clientX - (r.left + r.width/2);
+        var my = e.clientY - (r.top + r.height/2);
+        el.style.transform = 'translate(' + mx*0.28 + 'px,' + my*0.4 + 'px)';
+      });
+      el.addEventListener('mouseleave', function(){ el.style.transform = ''; });
+    });
+  }
+
+  /* ---------- Tilt on index media ---------- */
+  if(finePointer && !reduce){
+    document.querySelectorAll('.index-row').forEach(function(row){
+      var media = row.querySelector('.tilt'); var img = media && media.querySelector('img');
+      if(!media) return;
+      row.addEventListener('mousemove', function(e){
+        var r = media.getBoundingClientRect();
+        var px = (e.clientX - r.left) / r.width - 0.5;
+        var py = (e.clientY - r.top) / r.height - 0.5;
+        if(img) img.style.transform = 'scale(1.05) rotateX(' + (-py*7) + 'deg) rotateY(' + (px*9) + 'deg)';
+      });
+      row.addEventListener('mouseleave', function(){ if(img) img.style.transform = ''; });
+    });
+  }
+
+  /* ---------- Index rows → scroll to section ---------- */
+  document.querySelectorAll('[data-goto]').forEach(function(row){
+    row.addEventListener('click', function(){
+      var el = document.getElementById(row.getAttribute('data-goto'));
+      if(el) el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth'});
+    });
+  });
+
+  /* ---------- Tabs ---------- */
+  document.querySelectorAll('.tabs').forEach(function(tabs){
+    var group = tabs.getAttribute('data-group');
+    tabs.querySelectorAll('.tab-btn').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        tabs.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-panel[data-group="'+group+'"]').forEach(function(p){ p.classList.remove('active'); });
+        var panel = document.getElementById(btn.getAttribute('data-tab'));
+        if(panel) panel.classList.add('active');
+      });
+    });
+  });
+
+  /* ---------- Lightbox ---------- */
+  var lightbox = document.getElementById('lightbox');
+  var lightboxImg = document.getElementById('lightboxImg');
+  function openLightbox(src){ lightboxImg.src = src; lightbox.classList.add('open'); }
+  function closeLightbox(){ lightbox.classList.remove('open'); }
+  document.querySelectorAll('[data-zoom]').forEach(function(f){
+    f.addEventListener('click', function(){ openLightbox(f.getAttribute('data-zoom')); });
+  });
+  document.getElementById('lbClose').addEventListener('click', closeLightbox);
+  lightbox.addEventListener('click', function(e){ if(e.target === lightbox) closeLightbox(); });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeLightbox(); });
+
+  /* ---------- Sun arc ---------- */
+  var svg = document.getElementById('sunarc');
+  var sunDot = document.getElementById('sunDot');
+  var arcClock = document.getElementById('arcClock');
+  var heroGlow = document.getElementById('heroGlow');
+  var sunWord = document.getElementById('sunWord');
+
+  function arcPoint(t){
+    // follows the dashed quadratic Bézier M40,220 Q460,-140 880,220 exactly.
+    // x is linear (control x = midpoint); y is a clean arch peaking at 40 at noon.
+    return { x: 40 + 840 * t, y: 220 - 720 * t * (1 - t) };
+  }
+  var palette = [
+    {t:0.0,  sun:'#e9968f', word:'dawn'},
+    {t:0.2,  sun:'#e5a83c', word:'sun'},
+    {t:0.5,  sun:'#f4c95d', word:'noon'},
+    {t:0.75, sun:'#b98be0', word:'light'},
+    {t:1.0,  sun:'#8b93ec', word:'dusk'}
+  ];
+  function hx(c){ return parseInt(c,16); }
+  function lerp(a,b,t){
+    var ar=hx(a.slice(1,3)),ag=hx(a.slice(3,5)),ab=hx(a.slice(5,7));
+    var br=hx(b.slice(1,3)),bg=hx(b.slice(3,5)),bb=hx(b.slice(5,7));
+    return 'rgb('+Math.round(ar+(br-ar)*t)+','+Math.round(ag+(bg-ag)*t)+','+Math.round(ab+(bb-ab)*t)+')';
+  }
+  function paletteAt(t){
+    for(var i=0;i<palette.length-1;i++){
+      if(t>=palette[i].t && t<=palette[i+1].t){
+        var span = palette[i+1].t - palette[i].t;
+        var local = span===0?0:(t-palette[i].t)/span;
+        return { sun: lerp(palette[i].sun, palette[i+1].sun, local), word: local<0.5?palette[i].word:palette[i+1].word };
+      }
+    }
+    return palette[palette.length-1];
+  }
+  function setArc(t){
+    t = Math.max(0, Math.min(1, t));
+    var p = arcPoint(t), pal = paletteAt(t);
+    sunDot.setAttribute('cx', p.x); sunDot.setAttribute('cy', p.y);
+    sunDot.setAttribute('fill', pal.sun);
+    heroGlow.style.setProperty('--sun', pal.sun);
+    document.querySelector('.hero').style.setProperty('--sun', pal.sun);
+    sunWord.textContent = pal.word;
+    var hour = 6 + t*12, hh = Math.floor(hour), mm = Math.round((hour-hh)*60);
+    arcClock.textContent = (hh<10?'0':'')+hh+':'+(mm<10?'0':'')+mm;
+  }
+
+  // markers
+  document.querySelectorAll('.arc-marker').forEach(function(m){
+    var t = parseFloat(m.getAttribute('data-t'));
+    var p = arcPoint(t);
+    var circle = m.querySelector('circle'), text = m.querySelector('text');
+    circle.setAttribute('cx', p.x); circle.setAttribute('cy', p.y);
+    circle.setAttribute('fill', paletteAt(t).sun);
+    text.setAttribute('x', p.x);
+    // label above the dot near the peak, below it near the ends — always inside the box
+    text.setAttribute('y', p.y < 70 ? p.y - 16 : p.y + 26);
+    m.addEventListener('click', function(){
+      setArc(t);
+      var el = document.getElementById(m.getAttribute('data-target'));
+      if(el) el.scrollIntoView({behavior: reduce ? 'auto' : 'smooth'});
+    });
+  });
+  setArc(0.18);
+
+  var dragging = false;
+  function pointerToT(evt){
+    var rect = svg.getBoundingClientRect();
+    var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+    var svgX = (clientX - rect.left) / rect.width * 920;
+    return (svgX - 40) / (880 - 40);
+  }
+  svg.addEventListener('pointerdown', function(e){
+    e.preventDefault(); dragging = true;
+    document.body.classList.add('dragging');
+    setArc(pointerToT(e));
+  });
+  window.addEventListener('pointermove', function(e){
+    if(!dragging) return;
+    if(window.getSelection){ var s = window.getSelection(); if(s.removeAllRanges) s.removeAllRanges(); }
+    setArc(pointerToT(e));
+  });
+  window.addEventListener('pointerup', function(){ dragging = false; document.body.classList.remove('dragging'); });
+
+  /* ---------- Louver demo ---------- */
+  var louverDemo = document.getElementById('louverDemo');
+  for(var i=0;i<6;i++){ var s = document.createElement('div'); s.className='louver-slat'; s.style.top = (16 + i*24)+'px'; louverDemo.appendChild(s); }
+  function updateLouvers(pct){
+    var angle = (pct/100) * 70;
+    louverDemo.querySelectorAll('.louver-slat').forEach(function(s){
+      s.style.transform = 'rotate(' + angle + 'deg)'; s.style.opacity = 0.55 + (pct/100)*0.45;
+    });
+  }
+  var ldrSlider = document.getElementById('ldrSlider'), ldrVal = document.getElementById('ldrVal');
+  ldrSlider.addEventListener('input', function(){ ldrVal.textContent = ldrSlider.value + '%'; updateLouvers(+ldrSlider.value); });
+  updateLouvers(+ldrSlider.value);
+
+  /* ---------- Melanopic lux ---------- */
+  var luxSlider = document.getElementById('luxSlider'), luxVal = document.getElementById('luxVal'), melResult = document.getElementById('melResult');
+  var currentMder = 1.1;
+  document.querySelectorAll('.toggle-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.toggle-btn').forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active'); currentMder = parseFloat(btn.getAttribute('data-mder')); updateMel();
+    });
+  });
+  function updateMel(){ luxVal.textContent = luxSlider.value + ' lux'; melResult.textContent = Math.round(+luxSlider.value * currentMder); }
+  luxSlider.addEventListener('input', updateMel); updateMel();
+})();
+</script>
+</body>
+</html>
