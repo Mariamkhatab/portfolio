@@ -2,7 +2,7 @@
 
 An interactive, single-page portfolio for **Mariam Khatab**, Architecture Engineering (New Giza University) — work at the intersection of architecture, environmental computation and machine learning.
 
-**Live site:** https://zeyadmahfouzz.github.io/portfolio/
+**Live site:** https://mariamkhatab.github.io/portfolio/
 
 ## Featured work
 
